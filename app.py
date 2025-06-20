@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -39,6 +40,35 @@ def register():
     mongo.db.users.insert_one(user)
 
     return jsonify({"message": "Пользователь успешно зарегистрирован!"}), 201
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"error": "Логин и пароль обязательны"}), 400
+
+    user = mongo.db.users.find_one({"username": username})
+
+    if not user:
+        return jsonify({"error": "Пользователь не найден"}), 404
+
+    if not check_password_hash(user["password"], password):
+        return jsonify({"error": "Неверный пароль"}), 401
+
+    return jsonify({
+        "message": "Авторизация успешна!",
+        "user": {
+            "username": user["username"],
+            "first_name": user["first_name"],
+            "last_name": user["last_name"]
+        }
+    }), 200
+
 
 if __name__ == "__main__":
     app.run(debug=True)
