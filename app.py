@@ -5,6 +5,13 @@ from werkzeug.security import check_password_hash
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
+import jwt
+import datetime
+
+from functools import wraps
+from flask import request
+
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 
 # Загрузка конфигурации из .env
 load_dotenv()
@@ -53,21 +60,43 @@ def login():
         return jsonify({"error": "Логин и пароль обязательны"}), 400
 
     user = mongo.db.users.find_one({"username": username})
+    if not user or not check_password_hash(user["password"], password):
+        return jsonify({"error": "Неверный логин или пароль"}), 401
 
-    if not user:
-        return jsonify({"error": "Пользователь не найден"}), 404
-
-    if not check_password_hash(user["password"], password):
-        return jsonify({"error": "Неверный пароль"}), 401
+    token = jwt.encode({
+        "user_id": str(user["_id"]),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+    }, SECRET_KEY, algorithm="HS256")
 
     return jsonify({
         "message": "Авторизация успешна!",
+        "token": token,
         "user": {
             "username": user["username"],
             "first_name": user["first_name"],
             "last_name": user["last_name"]
         }
     }), 200
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split(" ")[1]
+
+        if not token:
+            return jsonify({'error': 'Токен не предоставлен'}), 401
+
+        try:
+            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            current_user = mongo.db.users.find_one({"_id": ObjectId(data["user_id"])})
+        except Exception as e:
+            return jsonify({'error': 'Недействительный токен'}), 401
+
+        return f(current_user, *args, **kwargs)
+    return decorated
 
 
 if __name__ == "__main__":
