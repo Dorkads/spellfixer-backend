@@ -5,13 +5,6 @@ from werkzeug.security import check_password_hash
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
-import jwt
-import datetime
-
-from functools import wraps
-from flask import request
-
-SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 
 # Загрузка конфигурации из .env
 load_dotenv()
@@ -60,17 +53,15 @@ def login():
         return jsonify({"error": "Логин и пароль обязательны"}), 400
 
     user = mongo.db.users.find_one({"username": username})
-    if not user or not check_password_hash(user["password"], password):
-        return jsonify({"error": "Неверный логин или пароль"}), 401
 
-    token = jwt.encode({
-        "user_id": str(user["_id"]),
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)
-    }, SECRET_KEY, algorithm="HS256")
+    if not user:
+        return jsonify({"error": "Пользователь не найден"}), 404
+
+    if not check_password_hash(user["password"], password):
+        return jsonify({"error": "Неверный пароль"}), 401
 
     return jsonify({
         "message": "Авторизация успешна!",
-        "token": token,
         "user": {
             "username": user["username"],
             "first_name": user["first_name"],
@@ -78,6 +69,18 @@ def login():
         }
     }), 200
 
+from ml_model import check_word
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    data = request.get_json()
+    word = data.get("word", "")
+
+    if not word:
+        return jsonify({"error": "Слово не передано"}), 400
+
+    result = check_word(word)
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(debug=True)
