@@ -69,6 +69,18 @@ def login():
         }
     }), 200
 
+from ml_model import check_word
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    data = request.get_json()
+    word = data.get("word", "")
+
+    if not word:
+        return jsonify({"error": "Слово не передано"}), 400
+
+    result = check_word(word)
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(debug=True)
