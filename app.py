@@ -3,8 +3,10 @@ from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from flask_cors import CORS
-import os
+from datetime import datetime
 from dotenv import load_dotenv
+import os
+import math
 
 # Загрузка конфигурации из .env
 load_dotenv()
@@ -81,6 +83,47 @@ def predict():
 
     result = check_word(word)
     return jsonify(result)
+
+# POST /history
+@app.route("/history", methods=["POST"])
+def post_history():
+    data = request.get_json() or {}
+    username    = data.get("username")
+    input_word  = data.get("input")
+    output_word = data.get("output")
+
+    if not username or not input_word or output_word is None:
+        return jsonify({"error": "username, input и output обязательны"}), 400
+
+    # Ставим текущее время сервера в UTC
+    now = datetime.utcnow()
+
+    mongo.db.history.insert_one({
+        "username": username,
+        "input":    input_word,
+        "output":   output_word,
+        "date":     now
+    })
+    return jsonify({"message": "История сохранена"}), 201
+
+
+# POST /history
+@app.route("/history", methods=["GET"])
+def get_history():
+    username = request.args.get("username")
+    if not username:
+        return jsonify({"error": "Username обязателен"}), 400
+
+    records = list(
+        mongo.db.history
+            .find({"username": username}, {"_id": False})
+            .sort("date", -1)
+    )
+
+    # Конвертим дату в ISO с Z, чтобы JS правильно воспринимал её как UTC
+    for r in records:
+        r["date"] = r["date"].isoformat() + "Z"
+    return jsonify(records), 200
 
 if __name__ == "__main__":
     app.run(debug=True)
