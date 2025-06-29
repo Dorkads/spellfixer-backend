@@ -20,22 +20,18 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Clone spellfixer-ml repo
+      - name: Prepare deploy files
         run: |
+          mkdir -p tmp/server
           git clone --branch deploy https://github.com/Dorkads/spellfixer-ml.git ml_repo
-
-      - name: Create clean deploy branch directory
-        run: |
-          rm -rf deploy_dir
-          mkdir -p deploy_dir/server
-          cp ml_repo/ml_artifacts -r deploy_dir/server/
-          cp ml_model.py app.py deploy_dir/server/
+          cp -r ml_repo/ml_artifacts tmp/server/
+          cp ml_model.py app.py tmp/server/
 
       - name: Switch to deploy branch
         run: |
           git checkout deploy || git checkout --orphan deploy
           rm -rf *
-          cp -r deploy_dir/* .
+          cp -r tmp/* .
 
       - name: Commit and push
         run: |
