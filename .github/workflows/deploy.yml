@@ -20,18 +20,26 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Prepare deploy files
+      - name: Create temp folder
+        run: mkdir -p tmp/server
+
+      - name: Clone ML repo and copy artifacts
         run: |
-          mkdir -p tmp/server
           git clone --branch deploy https://github.com/Dorkads/spellfixer-ml.git ml_repo
+          ls -la ml_repo
           cp -r ml_repo/ml_artifacts tmp/server/
+
+      - name: Copy backend files
+        run: |
+          ls -la
           cp ml_model.py app.py tmp/server/
 
-      - name: Switch to deploy branch
+      - name: Switch to deploy branch and replace contents
         run: |
           git checkout deploy || git checkout --orphan deploy
           rm -rf *
-          cp -r tmp/* .
+          ls -la tmp/server
+          cp -r tmp/server ./server
 
       - name: Commit and push
         run: |
